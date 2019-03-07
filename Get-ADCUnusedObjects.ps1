@@ -289,7 +289,6 @@ outputUnusedADCObjects "authentication storefrontAuthAction" "StorefrontAuth Act
 outputUnusedADCObjects "authentication tacacsPolicy" "TACACS Classic Authentication Policies"
 outputUnusedADCObjects "authentication tacacsAction" "TACACS Actions"
 outputUnusedADCObjects "authentication webAuthAction" "Web Auth Actions"
-outputUnusedADCObjects "authentication samlPolicy" "SAML Classic Authentication Policies"
 outputUnusedADCObjects "authentication policy" "Advanced Authentication Policies"
 outputUnusedADCObjects "authentication loginSchema" "Login Schemas"
 outputUnusedADCObjects "authentication loginSchemaPolicy" "Login Schema Policies"
