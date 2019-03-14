@@ -165,9 +165,9 @@ function outputObjectConfig ($header, $NSObjectType, $typeNeeded) {
     foreach ($uniqueObject in $uniqueObjects) {       
         # The "rm" command for LB Monitors requires a type parameter
         if ($typeNeeded) {
-            $type = $config -match ("add " + $NSObjectType + " " + $uniqueObject + " (\w+)") | select-object -First 1
+            $type = $config -match ("add " + $NSObjectType + " " + $uniqueObject + " (\S+)") | select-object -First 1
             if ($type) {
-                $type = $type -match ("add " + $NSObjectType + " " + $uniqueObject + " (\w+)")
+                $type = $type -match ("add " + $NSObjectType + " " + $uniqueObject + " (\S+)")
                 $type = $Matches[1]
                 $output += ("rm " + $NSObjectType + " " + $uniqueObject + " " + $type + "`n")
             } else {
