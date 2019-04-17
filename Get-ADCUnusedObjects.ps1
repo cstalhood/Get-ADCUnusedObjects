@@ -109,7 +109,7 @@ function getUnusedNSObjects ($matchConfig, $NSObjectType, $paramName, $position)
         $objectCandidateDots = $objectCandidate -replace "\.", "\."
 
         # Don't remove ADNS Services
-        if ($NSObjectType -eq "service" -and ($matchConfig | select-string -Pattern ('^add service ' + $objectCandidate + ' \d+.\d+.\d+.\d+ ADNS'))) {
+        if ($NSObjectType -eq "service" -and ($matchConfig | select-string -Pattern ('^add service ' + $objectCandidate + ' \S+ ADNS'))) {
             continue
         }
 
