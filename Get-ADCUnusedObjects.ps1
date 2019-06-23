@@ -17,7 +17,7 @@ param (
 
     # Optional text editor to open saved output file - text editor should handle UNIX line endings (e.g. Wordpad or Notepad++)
     [string]$textEditor = "c:\Program Files (x86)\Notepad++\notepad++.exe"
-
+    #[string]$textEditor = "/usr/local/bin/code"
 )
 
 # Change Log
@@ -26,6 +26,13 @@ param (
 #  Start of script code
 cls
 
+if ($IsMacOS -and $outputFile -match "\\") {
+    $outputFile = "$env:HOME/Downloads/UnusedObjects.txt"
+}
+
+if ($IsMacOS -and $textEditor -match "\\") {
+    $textEditor = "/usr/local/bin/code"
+}
 
 #  Function to prompt the user for a NetScaler config file.
 #  The NetScaler config file can be found in the System > Diagnostics > Running Configuration location in the GUI
@@ -114,20 +121,24 @@ function getUnusedNSObjects ($matchConfig, $NSObjectType, $paramName, $position)
         }
 
         # Don't remove built-in cache policies
-        if ($NSObjectType -eq "cache policy" -and $objectCandidate -match "^ctx_") {
+        if ($NSObjectType -eq "cache policy" -and $objectCandidateDots -match "^ctx_") {
             continue
         }
 
         # Don't remove built-in cache content groups
-        if ($NSObjectType -eq "cache contentGroup" -and ($objectCandidate -match "BASEFILE" -or $objectCandidate -match "DELTAJS")) {
+        if ($NSObjectType -eq "cache contentGroup" -and ($objectCandidate -match "BASEFILE" -or $objectCandidateDots -match "DELTAJS")) {
             continue
         }
         
         # strip current object from config so remaining config can be checked
-        $remainingConfig = $matchConfig | select-string -Pattern ('^(add|bind|set) ' + $NSObjectType + ' ' + $objectCandidate + ' ') -NotMatch
+        $remainingConfig = $matchConfig | select-string -Pattern ('^(add|bind|set) ' + $NSObjectType + ' ' + $objectCandidateDots + ' ') -NotMatch
+        $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) ' + $NSObjectType + ' ' + $objectCandidateDots + '$') -NotMatch
 
         # strip SSL settings for current object from remaining config
-        $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) ssl (service|vserver|servicegroup|monitor|cipher|certkey) ' + $objectCandidate + ' ') -NotMatch
+        $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) ssl (service|vserver|servicegroup|monitor|cipher|certkey) ' + $objectCandidateDots + ' ') -NotMatch
+
+        # strip transform actions from remaining config
+        $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) transform action ') -NotMatch
 
         # if ($objectCandidate -match "storefront") { write-host $objectCandidate;write-host ($matchConfig);read-host}
         # if ($NSObjectType -match "ssl certKey") { write-host $objectCandidate;write-host ($matchConfig);read-host}
@@ -221,7 +232,6 @@ outputUnusedADCObjects "responder policy" "Responder Policies"
 outputUnusedADCObjects "responder action" "Responder Actions"
 outputUnusedADCObjects "responder policylabel" "Responder Policy Labels"
 outputUnusedADCObjects "transform policy" "Transform Policies"
-outputUnusedADCObjects "transform action" "Transform Actions"
 outputUnusedADCObjects "transform profile" "Transform Profiles"
 outputUnusedADCObjects "vpn sessionPolicy" "Gateway Session Policies"
 outputUnusedADCObjects "vpn sessionAction" "Gateway Session Profiles"
