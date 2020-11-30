@@ -1,5 +1,6 @@
 # Get NetScaler Unused Objects
 # Note: This script works on Windows 10, but the regex match group commands fail on Windows 7
+# Note: Give the configuration file as first parameter for Linux 
 
 param (
     # Full path to source config file saved from NetScaler ADC (System > Diagnostics > Running Configuration)
@@ -26,12 +27,14 @@ param (
 #  Start of script code
 cls
 
-if ($IsMacOS -and $outputFile -match "\\") {
+if (($IsMacOS -or $IsLinux) -and $outputFile -match "\\") {
     $outputFile = "$env:HOME/Downloads/UnusedObjects.txt"
 }
 
 if ($IsMacOS -and $textEditor -match "\\") {
     $textEditor = "/usr/local/bin/code"
+} elseif ($IsLinux -and $textEditor -match "\\") {
+    $textEditor = "/usr/bin/code"
 }
 
 #  Function to prompt the user for a NetScaler config file.
@@ -40,6 +43,9 @@ Function Get-InputFile($initialDirectory)
 {
     if ($IsMacOS){
         $filename = (('tell application "SystemUIServer"'+"`n"+'activate'+"`n"+'set fileName to POSIX path of (choose file with prompt "NetScaler documentation file")'+"`n"+'end tell' | osascript -s s) -split '"')[1]
+        if ([String]::IsNullOrEmpty($filename)){break}else{$filename}
+    } elseif ($IsLinux) {
+        $filename = $args[0]
         if ([String]::IsNullOrEmpty($filename)){break}else{$filename}
     }else{
         [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null
@@ -55,7 +61,7 @@ Function Get-InputFile($initialDirectory)
 #  Function to prompt the user to save the output file
 Function Get-OutputFile($initialDirectory)
 {
-    if ($IsMacOS){
+    if ($IsMacOS -or $IsLinux){
         $DefaultName = 'default name "UnusedObjects.txt"'
         if ($initialDirectory){
             $DefaultLocation = 'default location "'+$initialDirectory+'"'
