@@ -17,7 +17,7 @@ param (
     #[string]$outputFile = "$env:HOME/Downloads/UnusedObjects.txt",
 
     # Optional text editor to open saved output file - text editor should handle UNIX line endings (e.g. Wordpad or Notepad++)
-    [string]$textEditor = "c:\Program Files (x86)\Notepad++\notepad++.exe"
+    [string]$textEditor = "notepad++.exe"
     #[string]$textEditor = "/usr/local/bin/code"
 )
 
@@ -110,16 +110,30 @@ function addNSObject ($NSObjectType, $NSObjectName) {
 }
 
 
+function getMatchExpression ($Objects) {
+    # returns a regex clause with multiple objects or'd to speed up regex matching
+    $matchExpression = "("
+    foreach ($uniqueObject in $Objects) {
+        $matchExpression += $uniqueObject + "|" 
+    }
+    $matchExpression = $matchExpression.Substring(0,$matchExpression.length - 1) + ")"
+    return $matchExpression
+}
+
+
 function getUnusedNSObjects ($matchConfig, $NSObjectType, $paramName, $position) {
     # Read all objects of type from from full config
     $objectsAll = $config | select-string -Pattern ('^add ' + $NSObjectType + ' (".*?"|[^-"]\S+)($| )') | % {$_.Matches.Groups[1].value}
-    
+    if (-not $objectsAll) { return }
+
     # Match objects to matchConfig
     $objectMatches = @()
+    $objectCandidatesDots = @()
     foreach ($objectCandidate in $objectsAll) {
         
         # For regex, replace dots with escaped dots
         $objectCandidateDots = $objectCandidate -replace "\.", "\."
+        $objectCandidatesDots += $objectCandidateDots
 
         # Don't remove ADNS Services
         if ($NSObjectType -eq "service" -and ($matchConfig | select-string -Pattern ('^add service ' + $objectCandidate + ' \S+ ADNS'))) {
@@ -135,23 +149,28 @@ function getUnusedNSObjects ($matchConfig, $NSObjectType, $paramName, $position)
         if ($NSObjectType -eq "cache contentGroup" -and ($objectCandidate -match "BASEFILE" -or $objectCandidateDots -match "DELTAJS")) {
             continue
         }
-        
-        # strip current object from config so remaining config can be checked
-        $remainingConfig = $matchConfig | select-string -Pattern ('^(add|bind|set) ' + $NSObjectType + ' ' + $objectCandidateDots + ' ') -NotMatch
-        $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) ' + $NSObjectType + ' ' + $objectCandidateDots + '$') -NotMatch
+    }
+    # strip current object from config so remaining config can be checked
+    $matchExpression = getMatchExpression $objectCandidatesDots
+    $remainingConfig = $matchConfig | select-string -Pattern ('^(add|bind|set) ' + $NSObjectType + ' ' + $matchExpression + ' ') -NotMatch
+    $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) ' + $NSObjectType + ' ' + $matchExpression + '$') -NotMatch
 
-        # strip SSL settings for current object from remaining config
-        $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) ssl (service|vserver|servicegroup|monitor|cipher|certkey) ' + $objectCandidateDots + ' ') -NotMatch
+    # strip SSL settings for current object from remaining config
+    $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) ssl (service|vserver|servicegroup|monitor|cipher|certkey) ' + $matchExpression + ' ') -NotMatch
 
-        # strip transform actions from remaining config
-        $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) transform action ') -NotMatch
+    # strip transform actions from remaining config
+    $remainingConfig = $remainingConfig | select-string -Pattern ('^(add|bind|set) transform action ') -NotMatch
 
-        # if ($objectCandidate -match "storefront") { write-host $objectCandidate;write-host ($matchConfig);read-host}
-        # if ($NSObjectType -match "ssl certKey") { write-host $objectCandidate;write-host ($matchConfig);read-host}
-        
+    # if ($objectCandidate -match "storefront") { write-host $objectCandidate;write-host ($matchConfig);read-host}
+    # if ($NSObjectType -match "ssl certKey") { write-host $objectCandidate;write-host ($matchConfig);read-host}
+    
+    foreach ($objectCandidate in  $objectsAll) {
+        $objectCandidateDots = $objectCandidate -replace "\.", "\."
         # Trying to avoid substring matches
-        if (($remainingConfig -match (" " + $objectCandidateDots + "$")) -or ($remainingConfig -match (" " + $objectCandidateDots + " "))) { 
+        if (($remainingConfig -match (" " + $objectCandidateDots + "$")) -or ($remainingConfig -match (" " + $objectCandidateDots + " ") -or ($remainingConfig -match (" " + $objectCandidateDots + '\"')))) { 
             # Look for candidate at end of string, or with spaces surrounding it - avoids substring matches
+            continue
+        } elseif (($remainingConfig -match ('[ "$(&|)]' + $objectCandidateDots + '[ (&"|)\[.]'))) {
             continue
         } elseif (($remainingConfig -match ('"' + $objectCandidateDots + '\\"')) -or ($remainingConfig -match ('\(' + $objectCandidateDots + '\)"'))) {
             # Look for AppExpert objects (e.g. policy sets, callouts) in policy expressions that don't have spaces around it
@@ -165,8 +184,8 @@ function getUnusedNSObjects ($matchConfig, $NSObjectType, $paramName, $position)
         } else {
             $objectMatches += $objectCandidate
         }
-        
     }
+        
     return $objectMatches
 }
 
@@ -341,19 +360,19 @@ outputUnusedADCObjects "gslb service" "GSLB Services"
 outputUnusedADCObjects "cr policy" "Cache Redirection Policies"
 
 
-if ($textEditor -and ($outputFile -and ($outputFile -ne "screen"))) {    
+#if ($textEditor -and ($outputFile -and ($outputFile -ne "screen"))) {    
 
     # Open Text Editor
 
-    if (Test-Path $textEditor -PathType Leaf){
+ #   if (Test-Path $textEditor -PathType Leaf){
 
         write-host "`nOpening Output file `"$outputFile`" using `"$textEditor`" ..."
 
         start-process -FilePath $textEditor -ArgumentList $outputFile
 
-    } else { 
-        write-host "`nText Editor not found: `"$textEditor`"" 
-        write-host "`nCan't open output file: `"$outputFile`""
-    }
+#    } else { 
+#        write-host "`nText Editor not found: `"$textEditor`"" 
+#        write-host "`nCan't open output file: `"$outputFile`""
+#    }
 
-}
+#}
